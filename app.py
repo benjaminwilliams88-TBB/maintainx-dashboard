@@ -114,13 +114,14 @@ def dashboard():
     </div>
 
     <table>
-        <tr>
-            <th>WO ID</th>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Assigned</th>
-            <th>Priority</th>
-        </tr>
+<tr>
+<th>WO #</th>
+<th>Title</th>
+<th>Status</th>
+<th>Priority</th>
+<th>Assigned</th>
+<th>Asset</th>
+</tr>
     """
 
     for wo_id, wo in active_workorders.items():
@@ -128,14 +129,15 @@ def dashboard():
         status = wo.get("status", "")
 
         html += f"""
-        <tr>
-            <td>{wo_id}</td>
-            <td>{wo.get('title', '')}</td>
-            <td class="{status}">{status}</td>
-            <td>{wo.get('assigned', '')}</td>
-            <td>{wo.get('priority', '')}</td>
-        </tr>
-        """
+<tr>
+    <td>{wo_id}</td>
+    <td>{wo.get('title','')}</td>
+    <td class="{status}">{status}</td>
+    <td>{wo.get('priority','')}</td>
+    <td>{wo.get('assigned','')}</td>
+    <td>{wo.get('asset','')}</td>
+</tr>
+"""
 
     html += """
     </table>
@@ -164,37 +166,23 @@ def webhook():
     if not workorder_id:
         return {"status": "ignored"}, 200
 
-    wo = get_workorder(workorder_id)
+    response = get_workorder(workorder_id)
 
-    if not wo:
+    if not response:
         return {"status": "api lookup failed"}, 200
 
-    status = str(
-        wo.get("status")
-        or payload.get("newStatus")
-        or ""
-    )
+    wo = response.get("workOrder", {})
 
-    assigned = ""
-
-    try:
-        assignees = wo.get("assignees", [])
-
-        if assignees:
-            assigned = (
-                assignees[0].get("name")
-                or assignees[0].get("fullName")
-                or str(assignees[0])
-            )
-
-    except Exception as e:
-        print(f"Assignee parsing error: {e}")
+    status = wo.get("status", "")
 
     active_workorders[workorder_id] = {
-        "title": wo.get("title", f"WO {workorder_id}"),
+        "title": wo.get("title", ""),
         "status": status,
-        "assigned": assigned,
-        "priority": wo.get("priority", "")
+        "priority": wo.get("priority", ""),
+        "assigned": ",".join(
+            [str(x) for x in wo.get("assigneeIds", [])]
+        ),
+        "asset": wo.get("assetId", "")
     }
 
     # Remove completed work orders
