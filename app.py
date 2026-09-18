@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 MX_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEzNzM2MTMsIm9yZ2FuaXphdGlvbklkIjo1MzEyODMsImlhdCI6MTc4OTY5MzMwMiwic3ViIjoiUkVTVF9BUElfQVVUSCIsImp0aSI6ImJlOWY2MGI2LWRmMGItNDNiMS05MTAyLTYyZDE1YjU0NTdlNiJ9.P7jYpIA63ngmwKkXM2HjLRA_pgW3vLPy54WZNnZrIlk"
 
-# Stores currently active work orders
+# Active work orders shown on dashboard
 active_workorders = {}
 
 
@@ -22,10 +22,16 @@ def get_workorder(workorder_id):
             timeout=10
         )
 
-        if response.status_code == 200:
-            return response.json()
+        print(f"API Status: {response.status_code}")
 
-        print(f"API Error: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+
+            print("WORK ORDER DETAILS:")
+            print(data)
+
+            return data
+
         print(response.text)
         return None
 
@@ -47,7 +53,7 @@ def dashboard():
         <style>
             body {
                 font-family: Arial, sans-serif;
-                background: #111;
+                background-color: #111;
                 color: white;
                 padding: 20px;
             }
@@ -56,44 +62,56 @@ def dashboard():
                 color: #00ccff;
             }
 
+            .summary {
+                font-size: 22px;
+                margin-bottom: 20px;
+            }
+
             table {
                 width: 100%;
                 border-collapse: collapse;
-                margin-top: 20px;
             }
 
             th {
-                background: #333;
-                padding: 10px;
+                background-color: #333;
+                padding: 12px;
                 text-align: left;
             }
 
             td {
-                padding: 10px;
+                padding: 12px;
                 border-bottom: 1px solid #444;
             }
 
-            .open {
+            .OPEN {
                 color: #4da6ff;
                 font-weight: bold;
             }
 
-            .progress {
+            .IN_PROGRESS {
                 color: orange;
                 font-weight: bold;
             }
 
-            .hold {
+            .ON_HOLD {
                 color: red;
+                font-weight: bold;
+            }
+
+            .DONE {
+                color: #66ff66;
                 font-weight: bold;
             }
         </style>
     </head>
     <body>
+    """
 
+    html += f"""
     <h1>MaintainX Live Dashboard</h1>
-
-    <h2>Active Work Orders: {}</h2>
+    <div class="summary">
+        Active Work Orders: {len(active_workorders)}
+    </div>
 
     <table>
         <tr>
@@ -103,30 +121,19 @@ def dashboard():
             <th>Assigned</th>
             <th>Priority</th>
         </tr>
-    """.format(len(active_workorders))
+    """
 
     for wo_id, wo in active_workorders.items():
 
-        status = wo.get("status", "UNKNOWN")
-
-        status_class = ""
-
-        if status == "OPEN":
-            status_class = "open"
-
-        elif status == "IN_PROGRESS":
-            status_class = "progress"
-
-        elif status == "ON_HOLD":
-            status_class = "hold"
+        status = wo.get("status", "")
 
         html += f"""
         <tr>
             <td>{wo_id}</td>
-            <td>{wo.get('title','')}</td>
-            <td class='{status_class}'>{status}</td>
-            <td>{wo.get('assigned','')}</td>
-            <td>{wo.get('priority','')}</td>
+            <td>{wo.get('title', '')}</td>
+            <td class="{status}">{status}</td>
+            <td>{wo.get('assigned', '')}</td>
+            <td>{wo.get('priority', '')}</td>
         </tr>
         """
 
@@ -147,8 +154,10 @@ def webhook():
 
     payload = request.json
 
+    print("===================================")
     print("WEBHOOK RECEIVED")
     print(payload)
+    print("===================================")
 
     workorder_id = payload.get("workOrderId")
 
@@ -157,44 +166,43 @@ def webhook():
 
     wo = get_workorder(workorder_id)
 
-    if wo:
+    if not wo:
+        return {"status": "api lookup failed"}, 200
 
-        status = str(
-            wo.get("status")
-            or wo.get("newStatus")
-            or ""
-        )
+    status = str(
+        wo.get("status")
+        or payload.get("newStatus")
+        or ""
+    )
 
-        assigned = ""
+    assigned = ""
 
-        try:
-            assignees = wo.get("assignees", [])
+    try:
+        assignees = wo.get("assignees", [])
 
-            if assignees:
-                first_assignee = assignees[0]
+        if assignees:
+            assigned = (
+                assignees[0].get("name")
+                or assignees[0].get("fullName")
+                or str(assignees[0])
+            )
 
-                assigned = (
-                    first_assignee.get("name")
-                    or first_assignee.get("fullName")
-                    or ""
-                )
+    except Exception as e:
+        print(f"Assignee parsing error: {e}")
 
-        except Exception:
-            pass
+    active_workorders[workorder_id] = {
+        "title": wo.get("title", f"WO {workorder_id}"),
+        "status": status,
+        "assigned": assigned,
+        "priority": wo.get("priority", "")
+    }
 
-        active_workorders[workorder_id] = {
-            "title": wo.get("title", ""),
-            "status": status,
-            "assigned": assigned,
-            "priority": wo.get("priority", "")
-        }
+    # Remove completed work orders
+    if status == "DONE":
+        active_workorders.pop(workorder_id, None)
 
-        # Remove completed work orders
-        if status == "DONE":
-            active_workorders.pop(workorder_id, None)
-
-        print("ACTIVE WORK ORDERS")
-        print(active_workorders)
+    print("ACTIVE WORK ORDERS")
+    print(active_workorders)
 
     return {"status": "received"}, 200
 
