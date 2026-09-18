@@ -51,19 +51,20 @@ def get_user_name(user_id):
             timeout=10
         )
 
-        print("USER LOOKUP STATUS")
-        print(response.status_code)
-
-        print("USER LOOKUP RESPONSE")
-        print(response.text)
-
         if response.status_code == 200:
 
             data = response.json()
 
-            users_cache[user_id] = str(data)
+            user = data.get("user", {})
 
-            return str(data)
+            full_name = (
+                f"{user.get('firstName', '')} "
+                f"{user.get('lastName', '')}"
+            ).strip()
+
+            users_cache[user_id] = full_name
+
+            return full_name
 
     except Exception as e:
         print(e)
@@ -238,7 +239,7 @@ def dashboard():
         html += f"""
         <tr>
 
-            <td>{wo_id}</td>
+           <td>{wo.get('wo_number','')}</td>
 
             <td>{wo.get("title","")}</td>
 
@@ -290,12 +291,18 @@ def webhook():
 
     status = wo.get("status", "")
 
-    assigned_name = ""
+assignees = wo.get("assigneeIds", [])
 
-    assignees = wo.get("assigneeIds", [])
+assigned_names = []
 
-    if assignees:
-        assigned_name = get_user_name(assignees[0])
+for user_id in assignees:
+
+    assigned_names.append(
+        get_user_name(user_id)
+    )
+
+assigned_name = ", ".join(assigned_names)
+`
 
     asset_name = ""
 
@@ -304,13 +311,16 @@ def webhook():
     if asset_id:
         asset_name = get_asset_name(asset_id)
 
-    active_workorders[workorder_id] = {
-        "title": wo.get("title", ""),
-        "status": status,
-        "priority": wo.get("priority", ""),
-        "assigned": assigned_name,
-        "asset": asset_name
-    }
+   active_workorders[workorder_id] = {
+
+    "wo_number": wo.get("sequentialId", workorder_id),
+
+    "title": wo.get("title", ""),
+    "status": status,
+    "priority": wo.get("priority", ""),
+    "assigned": assigned_name,
+    "asset": asset_name
+}
 
     if status == "DONE":
         active_workorders.pop(workorder_id, None)
