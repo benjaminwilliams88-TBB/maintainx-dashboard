@@ -291,17 +291,17 @@ def webhook():
 
     status = wo.get("status", "")
 
-assignees = wo.get("assigneeIds", [])
+    assignees = wo.get("assigneeIds", [])
 
-assigned_names = []
+    assigned_names = []
 
-for user_id in assignees:
+    for user_id in assignees:
 
-    assigned_names.append(
-        get_user_name(user_id)
-    )
+        assigned_names.append(
+            get_user_name(user_id)
+        )
 
-assigned_name = ", ".join(assigned_names)
+    assigned_name = ", ".join(assigned_names)
 
     asset_name = ""
 
@@ -310,16 +310,16 @@ assigned_name = ", ".join(assigned_names)
     if asset_id:
         asset_name = get_asset_name(asset_id)
 
-   active_workorders[workorder_id] = {
+    active_workorders[workorder_id] = {
 
-    "wo_number": wo.get("sequentialId", workorder_id),
+        "wo_number": wo.get("sequentialId", workorder_id),
 
-    "title": wo.get("title", ""),
-    "status": status,
-    "priority": wo.get("priority", ""),
-    "assigned": assigned_name,
-    "asset": asset_name
-}
+        "title": wo.get("title", ""),
+        "status": status,
+        "priority": wo.get("priority", ""),
+        "assigned": assigned_name,
+        "asset": asset_name
+    }
 
     if status == "DONE":
         active_workorders.pop(workorder_id, None)
