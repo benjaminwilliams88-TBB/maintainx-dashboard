@@ -3,7 +3,9 @@ import requests
 
 app = Flask(__name__)
 
-MX_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEzNzM2MTMsIm9yZ2FuaXphdGlvbklkIjo1MzEyODMsImlhdCI6MTc4OTY5MzMwMiwic3ViIjoiUkVTVF9BUElfQVVUSCIsImp0aSI6ImJlOWY2MGI2LWRmMGItNDNiMS05MTAyLTYyZDE1YjU0NTdlNiJ9.P7jYpIA63ngmwKkXM2HjLRA_pgW3vLPy54WZNnZrIlk"
+import os
+
+MX_API_KEY = os.getenv("MX_API_KEY")
 active_workorders = {}
 
 users_cache = {}
