@@ -4,143 +4,262 @@ import requests
 app = Flask(__name__)
 
 MX_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEzNzM2MTMsIm9yZ2FuaXphdGlvbklkIjo1MzEyODMsImlhdCI6MTc4OTY5MzMwMiwic3ViIjoiUkVTVF9BUElfQVVUSCIsImp0aSI6ImJlOWY2MGI2LWRmMGItNDNiMS05MTAyLTYyZDE1YjU0NTdlNiJ9.P7jYpIA63ngmwKkXM2HjLRA_pgW3vLPy54WZNnZrIlk"
-
-# Active work orders shown on dashboard
 active_workorders = {}
 
+users_cache = {}
+assets_cache = {}
 
-def get_workorder(workorder_id):
-    headers = {
+
+def mx_headers():
+    return {
         "Authorization": f"Bearer {MX_API_KEY}",
         "Accept": "application/json"
     }
 
+
+def get_workorder(workorder_id):
+
     try:
+
         response = requests.get(
             f"https://api.getmaintainx.com/v1/workorders/{workorder_id}",
-            headers=headers,
+            headers=mx_headers(),
             timeout=10
         )
 
-        print(f"API Status: {response.status_code}")
+        print(f"WORKORDER STATUS: {response.status_code}")
 
         if response.status_code == 200:
-            data = response.json()
-
-            print("WORK ORDER DETAILS:")
-            print(data)
-
-            return data
-
-        print(response.text)
-        return None
+            return response.json()
 
     except Exception as e:
-        print(f"API Exception: {e}")
-        return None
+        print(e)
+
+    return None
+
+
+def get_user_name(user_id):
+
+    if user_id in users_cache:
+        return users_cache[user_id]
+
+    try:
+
+        response = requests.get(
+            f"https://api.getmaintainx.com/v1/users/{user_id}",
+            headers=mx_headers(),
+            timeout=10
+        )
+
+        if response.status_code == 200:
+
+            data = response.json()
+
+            user = data.get("user", {})
+
+            name = (
+                user.get("fullName")
+                or user.get("name")
+                or str(user_id)
+            )
+
+            users_cache[user_id] = name
+
+            return name
+
+    except Exception as e:
+        print(e)
+
+    return str(user_id)
+
+
+def get_asset_name(asset_id):
+
+    if asset_id in assets_cache:
+        return assets_cache[asset_id]
+
+    try:
+
+        response = requests.get(
+            f"https://api.getmaintainx.com/v1/assets/{asset_id}",
+            headers=mx_headers(),
+            timeout=10
+        )
+
+        if response.status_code == 200:
+
+            data = response.json()
+
+            asset = data.get("asset", {})
+
+            name = asset.get("name", str(asset_id))
+
+            assets_cache[asset_id] = name
+
+            return name
+
+    except Exception as e:
+        print(e)
+
+    return str(asset_id)
 
 
 @app.route("/")
 def dashboard():
 
-    html = """
+    open_count = 0
+    progress_count = 0
+    hold_count = 0
+
+    for wo in active_workorders.values():
+
+        status = wo.get("status")
+
+        if status == "OPEN":
+            open_count += 1
+
+        elif status == "IN_PROGRESS":
+            progress_count += 1
+
+        elif status == "ON_HOLD":
+            hold_count += 1
+
+    html = f"""
     <html>
+
     <head>
+
         <title>MaintainX Live Dashboard</title>
 
-        <meta http-equiv="refresh" content="15">
+        <meta http-equiv="refresh" content="5">
 
         <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #111;
-                color: white;
-                padding: 20px;
-            }
 
-            h1 {
-                color: #00ccff;
-            }
+        body {{
+            font-family: Arial;
+            background:#111;
+            color:white;
+            padding:20px;
+        }}
 
-            .summary {
-                font-size: 22px;
-                margin-bottom: 20px;
-            }
+        h1 {{
+            color:#00ccff;
+        }}
 
-            table {
-                width: 100%;
-                border-collapse: collapse;
-            }
+        .cards {{
+            display:flex;
+            gap:20px;
+            margin-bottom:30px;
+        }}
 
-            th {
-                background-color: #333;
-                padding: 12px;
-                text-align: left;
-            }
+        .card {{
+            background:#222;
+            padding:20px;
+            border-radius:10px;
+            min-width:150px;
+            text-align:center;
+        }}
 
-            td {
-                padding: 12px;
-                border-bottom: 1px solid #444;
-            }
+        .count {{
+            font-size:42px;
+            font-weight:bold;
+        }}
 
-            .OPEN {
-                color: #4da6ff;
-                font-weight: bold;
-            }
+        table {{
+            width:100%;
+            border-collapse:collapse;
+        }}
 
-            .IN_PROGRESS {
-                color: orange;
-                font-weight: bold;
-            }
+        th {{
+            background:#333;
+            padding:12px;
+            text-align:left;
+        }}
 
-            .ON_HOLD {
-                color: red;
-                font-weight: bold;
-            }
+        td {{
+            padding:12px;
+            border-bottom:1px solid #444;
+        }}
 
-            .DONE {
-                color: #66ff66;
-                font-weight: bold;
-            }
+        .OPEN {{
+            color:#4da6ff;
+            font-weight:bold;
+        }}
+
+        .IN_PROGRESS {{
+            color:orange;
+            font-weight:bold;
+        }}
+
+        .ON_HOLD {{
+            color:red;
+            font-weight:bold;
+        }}
+
         </style>
-    </head>
-    <body>
-    """
 
-    html += f"""
+    </head>
+
+    <body>
+
     <h1>MaintainX Live Dashboard</h1>
-    <div class="summary">
-        Active Work Orders: {len(active_workorders)}
+
+    <div class="cards">
+
+        <div class="card">
+            <div>OPEN</div>
+            <div class="count">{open_count}</div>
+        </div>
+
+        <div class="card">
+            <div>IN PROGRESS</div>
+            <div class="count">{progress_count}</div>
+        </div>
+
+        <div class="card">
+            <div>ON HOLD</div>
+            <div class="count">{hold_count}</div>
+        </div>
+
     </div>
 
     <table>
-<tr>
-<th>WO #</th>
-<th>Title</th>
-<th>Status</th>
-<th>Priority</th>
-<th>Assigned</th>
-<th>Asset</th>
-</tr>
+
+        <tr>
+            <th>WO #</th>
+            <th>Title</th>
+            <th>Asset</th>
+            <th>Assigned</th>
+            <th>Priority</th>
+            <th>Status</th>
+        </tr>
     """
 
     for wo_id, wo in active_workorders.items():
 
-        status = wo.get("status", "")
-
         html += f"""
-<tr>
-    <td>{wo_id}</td>
-    <td>{wo.get('title','')}</td>
-    <td class="{status}">{status}</td>
-    <td>{wo.get('priority','')}</td>
-    <td>{wo.get('assigned','')}</td>
-    <td>{wo.get('asset','')}</td>
-</tr>
-"""
+        <tr>
+
+            <td>{wo_id}</td>
+
+            <td>{wo.get("title","")}</td>
+
+            <td>{wo.get("asset","")}</td>
+
+            <td>{wo.get("assigned","")}</td>
+
+            <td>{wo.get("priority","")}</td>
+
+            <td class="{wo.get("status","")}">
+                {wo.get("status","")}
+            </td>
+
+        </tr>
+        """
 
     html += """
     </table>
+
     </body>
     </html>
     """
@@ -152,14 +271,12 @@ def dashboard():
 def webhook():
 
     if request.method == "GET":
-        return "Webhook endpoint is online"
+        return "Webhook endpoint online"
 
     payload = request.json
 
-    print("===================================")
     print("WEBHOOK RECEIVED")
     print(payload)
-    print("===================================")
 
     workorder_id = payload.get("workOrderId")
 
@@ -175,21 +292,31 @@ def webhook():
 
     status = wo.get("status", "")
 
+    assigned_name = ""
+
+    assignees = wo.get("assigneeIds", [])
+
+    if assignees:
+        assigned_name = get_user_name(assignees[0])
+
+    asset_name = ""
+
+    asset_id = wo.get("assetId")
+
+    if asset_id:
+        asset_name = get_asset_name(asset_id)
+
     active_workorders[workorder_id] = {
         "title": wo.get("title", ""),
         "status": status,
         "priority": wo.get("priority", ""),
-        "assigned": ",".join(
-            [str(x) for x in wo.get("assigneeIds", [])]
-        ),
-        "asset": wo.get("assetId", "")
+        "assigned": assigned_name,
+        "asset": asset_name
     }
 
-    # Remove completed work orders
     if status == "DONE":
         active_workorders.pop(workorder_id, None)
 
-    print("ACTIVE WORK ORDERS")
     print(active_workorders)
 
     return {"status": "received"}, 200
