@@ -302,7 +302,6 @@ for user_id in assignees:
     )
 
 assigned_name = ", ".join(assigned_names)
-`
 
     asset_name = ""
 
