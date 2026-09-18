@@ -51,21 +51,19 @@ def get_user_name(user_id):
             timeout=10
         )
 
+        print("USER LOOKUP STATUS")
+        print(response.status_code)
+
+        print("USER LOOKUP RESPONSE")
+        print(response.text)
+
         if response.status_code == 200:
 
             data = response.json()
 
-            user = data.get("user", {})
+            users_cache[user_id] = str(data)
 
-            name = (
-                user.get("fullName")
-                or user.get("name")
-                or str(user_id)
-            )
-
-            users_cache[user_id] = name
-
-            return name
+            return str(data)
 
     except Exception as e:
         print(e)
